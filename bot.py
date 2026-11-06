@@ -9,6 +9,7 @@ from telegram.ext import (
     MessageHandler,
     ContextTypes,
     filters,
+    PicklePersistence,
 )
 
 from config import Config
@@ -35,18 +36,21 @@ os.makedirs(Config.LOG_FOLDER, exist_ok=True)
 # --------------------------------------------------
 # /start command
 # --------------------------------------------------
+def save_user_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
+    """Save the sender's Telegram account name in persistent user data."""
+    user = update.effective_user
+    name = user.first_name if user and user.first_name else (user.full_name if user else "there")
+    if user:
+        context.user_data["account_name"] = name
+    return name
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    text = (
-        "👋 Welcome!\n\n"
-        "📸 Send me a photo.\n\n"
-        "✨ I'll automatically:\n"
-        "• Crop it into a square\n"
-        "• Apply the official challenge frame\n"
-        "• Return a profile-picture-ready image."
+    name = save_user_name(update, context)
+    await update.message.reply_text(
+        f'Welcome "{name}"\n'
+        "Send me your photo, and I'll turn it into a poster for you."
     )
-
-    await update.message.reply_text(text)
 
 
 # --------------------------------------------------
@@ -63,6 +67,8 @@ async def invalid(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Photo handler
 # --------------------------------------------------
 async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    save_user_name(update, context)
 
     input_path = None
     output_path = None
@@ -144,9 +150,8 @@ def main():
             "BOT_TOKEN is missing. Check Railway Variables."
         )
 
-    app = ApplicationBuilder().token(
-        Config.BOT_TOKEN
-    ).build()
+    persistence = PicklePersistence(filepath="user_data.pickle")
+    app = ApplicationBuilder().token(Config.BOT_TOKEN).persistence(persistence).build()
 
     # Commands
     app.add_handler(
