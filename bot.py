@@ -1,3 +1,4 @@
+import asyncio
 import os
 import logging
 from uuid import uuid4
@@ -57,7 +58,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Invalid message handler
 # --------------------------------------------------
 async def invalid(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     await update.message.reply_text(
         "📸 Please send a photo."
     )
@@ -67,7 +67,6 @@ async def invalid(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Photo handler
 # --------------------------------------------------
 async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     save_user_name(update, context)
 
     input_path = None
@@ -78,7 +77,6 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     try:
-
         unique_id = uuid4().hex
 
         input_path = os.path.join(
@@ -100,18 +98,19 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         logger.info("Photo downloaded successfully.")
 
-        # Edit image
-        edit_image(input_path, output_path)
+        # Edit image in a worker thread so the async event loop stays responsive
+        await asyncio.to_thread(edit_image, input_path, output_path)
 
         logger.info("Image edited successfully.")
 
-        # Send edited image
-        with open(output_path, "rb") as image:
+        # Read file as bytes before sending to prevent Windows file-lock errors on removal
+        with open(output_path, "rb") as image_file:
+            image_bytes = image_file.read()
 
-            await update.message.reply_photo(
-                photo=image,
-                caption="✅ Your profile picture is ready!"
-            )
+        await update.message.reply_photo(
+            photo=image_bytes,
+            caption="✅ Your profile picture is ready!"
+        )
 
         # Remove processing message
         await processing.delete()
@@ -119,7 +118,6 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.info("Edited image sent.")
 
     except Exception as e:
-
         logger.exception("Error processing image")
 
         try:
@@ -132,25 +130,30 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     finally:
-
         if input_path and os.path.exists(input_path):
-            os.remove(input_path)
+            try:
+                os.remove(input_path)
+            except Exception as e:
+                logger.warning(f"Could not remove input file {input_path}: {e}")
 
         if output_path and os.path.exists(output_path):
-            os.remove(output_path)
+            try:
+                os.remove(output_path)
+            except Exception as e:
+                logger.warning(f"Could not remove output file {output_path}: {e}")
 
 
 # --------------------------------------------------
 # Main
 # --------------------------------------------------
 def main():
-
     if not Config.BOT_TOKEN:
         raise ValueError(
-            "BOT_TOKEN is missing. Check Railway Variables."
+            "BOT_TOKEN is missing. Please set BOT_TOKEN in your .env file."
         )
 
-    persistence = PicklePersistence(filepath="user_data.pickle")
+    persistence_file = os.path.join(Config.BASE_DIR, "user_data.pickle")
+    persistence = PicklePersistence(filepath=persistence_file)
     app = ApplicationBuilder().token(Config.BOT_TOKEN).persistence(persistence).build()
 
     # Commands
@@ -175,7 +178,6 @@ def main():
     )
 
     logger.info("Bot started successfully.")
-
     app.run_polling()
 
 

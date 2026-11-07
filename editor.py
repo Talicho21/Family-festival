@@ -1,3 +1,4 @@
+import os
 from PIL import Image, ImageOps
 import cv2
 import numpy as np
@@ -7,12 +8,29 @@ from config import Config
 
 def _detect_face(image):
     """Return the largest frontal face box (x, y, width, height), if found."""
-    rgb = image.convert("RGB")
-    gray = cv2.cvtColor(np.asarray(rgb), cv2.COLOR_RGB2GRAY)
-    cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-    detector = cv2.CascadeClassifier(cascade_path)
-    faces = detector.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(40, 40))
-    return max(faces, key=lambda box: box[2] * box[3]) if len(faces) else None
+    try:
+        # Use dynamic attribute lookup so IDEs/type checkers don't flag missing C-extension members
+        cascade_classifier = getattr(cv2, "CascadeClassifier", None)
+        cv2_data = getattr(cv2, "data", None)
+        haarcascades_dir = getattr(cv2_data, "haarcascades", None) if cv2_data else None
+
+        if not cascade_classifier or not haarcascades_dir:
+            return None
+
+        cascade_path = os.path.join(haarcascades_dir, "haarcascade_frontalface_default.xml")
+        if not os.path.isfile(cascade_path):
+            return None
+
+        rgb = image.convert("RGB")
+        gray = cv2.cvtColor(np.asarray(rgb), cv2.COLOR_RGB2GRAY)
+        detector = cascade_classifier(cascade_path)
+        if detector.empty():
+            return None
+
+        faces = detector.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(40, 40))
+        return max(faces, key=lambda box: box[2] * box[3]) if len(faces) else None
+    except Exception:
+        return None
 
 
 def _photo_area_height(overlay):
@@ -61,8 +79,10 @@ def _crop_for_poster(image, target_size):
 
 
 def edit_image(input_path, output_path):
-    photo = ImageOps.exif_transpose(Image.open(input_path)).convert("RGBA")
-    overlay = Image.open(Config.OVERLAY_PATH).convert("RGBA")
+    with Image.open(input_path) as raw_photo:
+        photo = ImageOps.exif_transpose(raw_photo).convert("RGBA")
+    with Image.open(Config.OVERLAY_PATH) as raw_overlay:
+        overlay = raw_overlay.convert("RGBA")
 
     canvas_size = overlay.size
     photo_height = _photo_area_height(overlay)

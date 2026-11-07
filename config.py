@@ -1,25 +1,28 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
+# Base directory for the project (always absolute)
+BASE_DIR = Path(__file__).resolve().parent
 
-load_dotenv()
+# Explicitly load .env from the project directory
+load_dotenv(BASE_DIR / ".env")
 
 
 class Config:
+    BASE_DIR = BASE_DIR
+
     # Telegram Bot Token
     BOT_TOKEN = os.getenv("BOT_TOKEN")
 
     # Project folders
-    DOWNLOAD_FOLDER = "downloads"
-    OUTPUT_FOLDER = "output"
-    OVERLAY_PATH = "assets/overlay.png"
-    LOG_FOLDER = "logs"
+    DOWNLOAD_FOLDER = str(BASE_DIR / "downloads")
+    OUTPUT_FOLDER = str(BASE_DIR / "output")
+    OVERLAY_PATH = str(BASE_DIR / "assets" / "overlay.png")
+    LOG_FOLDER = str(BASE_DIR / "logs")
 
     # Font
-    FONT_PATH = os.path.join(
-        "fonts",
-        "NotoSansEthiopic-Regular.ttf"
-    )
+    FONT_PATH = str(BASE_DIR / "fonts" / "NotoSansEthiopic-Regular.ttf")
 
     # Text
     TEXT = "እኔም እገኛለሁ"

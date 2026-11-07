@@ -30,7 +30,7 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         logger.info(f"Edited: {output_path}")
 
-        # IMPORTANT FIX: read file as bytes BEFORE sending
+        # Read file as bytes BEFORE sending
         with open(output_path, "rb") as f:
             image_bytes = f.read()
 
@@ -43,10 +43,16 @@ async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Error processing image")
 
     finally:
-        if os.path.exists(input_path):
-            os.remove(input_path)
+        if input_path and os.path.exists(input_path):
+            try:
+                os.remove(input_path)
+            except Exception as e:
+                logger.warning(f"Could not remove {input_path}: {e}")
 
-        if os.path.exists(output_path):
-            os.remove(output_path)
+        if output_path and os.path.exists(output_path):
+            try:
+                os.remove(output_path)
+            except Exception as e:
+                logger.warning(f"Could not remove {output_path}: {e}")
 
         logger.info("Cleaned temporary files")
