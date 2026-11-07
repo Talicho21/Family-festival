@@ -40,3 +40,4 @@ A Telegram bot that transforms photos into event posters with customized overlay
    ```bash
    python bot.py
    ```
+
